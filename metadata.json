@@ -1,0 +1,6 @@
+{
+  "name": "CineSync",
+  "description": "Aplicación de películas con búsqueda, lista de favoritos personalizada, historial de visualización, recomendaciones inteligentes y sincronización en tiempo real con Firebase Firestore.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
