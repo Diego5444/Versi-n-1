@@ -121,8 +121,8 @@ fun VideoPlayerScreen(
     var selectedSpeed by remember { mutableFloatStateOf(1.0f) }
 
     // Aspect Ratio / Fullscreen Modes
-    // RESIZE_MODE_FIT (0), RESIZE_MODE_FILL (3), RESIZE_MODE_ZOOM (4)
-    var resizeMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
+    // RESIZE_MODE_ZOOM (4 - fill screen without black bars), RESIZE_MODE_FILL (3), RESIZE_MODE_FIT (0)
+    var resizeMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_ZOOM) }
     var isLandscape by remember { mutableStateOf(false) }
 
     // Device physical orientation & manual landscape override
@@ -131,7 +131,7 @@ fun VideoPlayerScreen(
     val isImmersive = isLandscape || isDeviceLandscape
 
     val effectiveResizeMode = if (isImmersive && resizeMode == AspectRatioFrameLayout.RESIZE_MODE_FIT) {
-        AspectRatioFrameLayout.RESIZE_MODE_FILL
+        AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     } else {
         resizeMode
     }
@@ -158,9 +158,7 @@ fun VideoPlayerScreen(
             showResizeDialog = false
         } else if (isImmersive) {
             isLandscape = false
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
         } else {
             onBack()
         }
@@ -171,7 +169,7 @@ fun VideoPlayerScreen(
     var dragPositionMs by remember { mutableFloatStateOf(0f) }
 
     // Manage Immersive Screen Insets (True Fullscreen)
-    DisposableEffect(isImmersive) {
+    LaunchedEffect(isImmersive) {
         val window = activity?.window
         if (window != null) {
             val insetsController = WindowCompat.getInsetsController(window, window.decorView)
@@ -188,10 +186,14 @@ fun VideoPlayerScreen(
                 insetsController.show(WindowInsetsCompat.Type.navigationBars())
             }
         }
+    }
+
+    // Clean up system bars & orientation on screen leave
+    DisposableEffect(Unit) {
         onDispose {
-            window?.let {
-                WindowCompat.setDecorFitsSystemWindows(it, true)
-                val insetsController = WindowCompat.getInsetsController(it, it.decorView)
+            activity?.window?.let { window ->
+                WindowCompat.setDecorFitsSystemWindows(window, true)
+                val insetsController = WindowCompat.getInsetsController(window, window.decorView)
                 insetsController.show(WindowInsetsCompat.Type.systemBars())
                 insetsController.show(WindowInsetsCompat.Type.statusBars())
                 insetsController.show(WindowInsetsCompat.Type.navigationBars())
@@ -457,13 +459,11 @@ fun VideoPlayerScreen(
                             onClick = {
                                 if (isImmersive) {
                                     isLandscape = false
-                                    activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                                     activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                                 } else {
                                     isLandscape = true
                                     activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+                                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                                 }
                             }
                         ) {
@@ -968,6 +968,59 @@ fun VideoPlayerScreen(
                 },
                 confirmButton = {
                     TextButton(onClick = { showEpisodeDialog = false }) {
+                        Text("Cerrar", color = Color.White)
+                    }
+                },
+                containerColor = Color(0xFF1E1E1E)
+            )
+        }
+
+        // Aspect Ratio / Screen Zoom Dialog
+        if (showResizeDialog) {
+            AlertDialog(
+                onDismissRequest = { showResizeDialog = false },
+                title = { Text("Escala de Video (Pantalla Completa)", color = Color.White) },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val options = listOf(
+                            Triple(AspectRatioFrameLayout.RESIZE_MODE_ZOOM, "Llenar Pantalla (Zoom - Sin Bordes)", "Amplía el video para ocupar toda la pantalla sin franjas negras"),
+                            Triple(AspectRatioFrameLayout.RESIZE_MODE_FILL, "Estirar a Pantalla Completa", "Estira la imagen para cubrir el 100% de la pantalla"),
+                            Triple(AspectRatioFrameLayout.RESIZE_MODE_FIT, "Ajustar con Bordes (Original)", "Conserva la proporción original del video con franjas negras")
+                        )
+
+                        options.forEach { (mode, title, desc) ->
+                            val isSelected = resizeMode == mode
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) Color(0xFFE50914).copy(alpha = 0.2f) else Color.Transparent)
+                                    .clickable {
+                                        resizeMode = mode
+                                        showResizeDialog = false
+                                    }
+                                    .padding(vertical = 12.dp, horizontal = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(desc, color = Color.Gray, fontSize = 12.sp)
+                                }
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFFE50914))
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showResizeDialog = false }) {
                         Text("Cerrar", color = Color.White)
                     }
                 },
